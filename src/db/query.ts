@@ -1,7 +1,7 @@
 import pool from "./db.ts";
 
-// We will get query and here we will process that
 const query = async (text: string, params: string[]) => {
+
     const startTime = Date.now();
     try {
         const res = await pool.query(text, params);
