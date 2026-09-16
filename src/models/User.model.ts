@@ -43,7 +43,8 @@ export interface UserId {
 }
 
 export interface JwtTokenPayload {
-    id: string;
+    userId: string;
+    sessionId: string;
     email: string;
     name: string;
 }
