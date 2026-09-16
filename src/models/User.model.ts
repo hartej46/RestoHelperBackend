@@ -1,5 +1,5 @@
 export interface User {
-    id: number;
+    id: string;
     name: string;
     phone_no: string;
     email: string;
@@ -9,7 +9,7 @@ export interface User {
 }
 
 export interface UserWithPassword {
-    id: number;
+    id: string;
     name: string;
     phone_no: string;
     email: string;
@@ -24,22 +24,22 @@ export interface CreateUser {
 }
 
 export interface UpdatePassword {
-    id: number;
+    id: string,
     password: string;
 }
 
 export interface UpdatePhoneNumber {
-    id: number;
+    id: string;
     phone_no: string;
 }
 
 export interface UpdateEmail {
-    id: number;
+    id: string;
     email: string;
 }
 
 export interface UserId {
-    id: number;
+    id: string;
 }
 
 export interface JwtTokenPayload {
