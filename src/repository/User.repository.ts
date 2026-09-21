@@ -18,6 +18,7 @@ export const createTableUser = async () => {
         phone_no VARCHAR (15) UNIQUE NOT NULL,
         email VARCHAR(100) UNIQUE NOT NULL,
         password TEXT NOT NULL,
+        verified BOOLEAN DEFAULT FALSE,
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
