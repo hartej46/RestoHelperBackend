@@ -3,6 +3,7 @@ export interface User {
     name: string;
     phone_no: string;
     email: string;
+    verified: boolean;
     created_at: Date;
     updated_at: Date;
     last_login: Date | null;
@@ -12,8 +13,12 @@ export interface UserWithPassword {
     id: string;
     name: string;
     phone_no: string;
+    verified: boolean;
     email: string;
     password: string;
+    created_at: Date;
+    updated_at: Date;
+    last_login: Date | null;
 }
 
 export interface CreateUser {
