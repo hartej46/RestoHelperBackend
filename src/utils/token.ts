@@ -63,12 +63,11 @@ const isCsrfTokenValid = ( csrfHeader : string, csrfCookie : string, csrf_secret
         const expectedCsrfBuffer = Buffer.from(expectedCsrfToken);
         const headerCsrfBuffer = Buffer.from(csrfHeader);
         const cookieCsrfBuffer = Buffer.from(csrfCookie);
-    
-        const isTokenSame = expectedCsrfBuffer == headerCsrfBuffer && expectedCsrfBuffer == cookieCsrfBuffer;
-    
-        const isTokenTimingSame = crypto.timingSafeEqual( expectedCsrfBuffer, headerCsrfBuffer) && crypto.timingSafeEqual( expectedCsrfBuffer, cookieCsrfBuffer );
+        if (expectedCsrfBuffer.length !== headerCsrfBuffer.length || expectedCsrfBuffer.length !== cookieCsrfBuffer.length) {
+            return false;
+        }
 
-        return isTokenSame && isTokenTimingSame;
+        return crypto.timingSafeEqual( expectedCsrfBuffer, headerCsrfBuffer) && crypto.timingSafeEqual( expectedCsrfBuffer, cookieCsrfBuffer );
 }
 
 export {
