@@ -33,15 +33,15 @@ export const createTableUser = async () => {
     }
 };
 
-export const createUser = async(name: string, phone_no: string, email: string, password: string) => {
+export const createUser = async(name: string, phone_no: string, email: string, password: string, verified: boolean) => {
     const hashedPassword = await hashPassword(password);
-    const query = `INSERT INTO users(name, phone_no, email, password)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, name, phone_no, email, created_at;
+    const query = `INSERT INTO users(name, phone_no, email, password, verified)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, name, phone_no, email, verified, created_at;
     `;
 
     try {
-        const res = await Query(query, [name, phone_no, email, hashedPassword]);
+        const res = await Query(query, [name, phone_no, email, hashedPassword, verified]);
         return res.rows[0] || null;
     } catch (error : unknown) {
         const errorMessage = error instanceof Error ? error.message : "Something went wrong while creating new user";
@@ -141,7 +141,7 @@ export const updateEmail = async ( id : string, email : string ) => {
     const query = `UPDATE users SET email = $1,
         updated_at = CURRENT_TIMESTAMP
         WHERE id = $2
-        RETURNING id, name, phone_no, email;`;
+        RETURNING id, name, phone_no, email, verified;`;
 
     try {
         const res = await Query( query, [ email  , id ]);
