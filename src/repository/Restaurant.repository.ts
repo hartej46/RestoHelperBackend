@@ -10,8 +10,8 @@ export const createRestaurantTable = async () => {
         END $$;
     `;
     const createTableQuery = `CREATE TABLE IF NOT EXISTS restaurant (
-        id UUID PRIMARY KEY,
-        owner_id UUID NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        owner_id INTEGER NOT NULL,
 
         restaurant_name VARCHAR(100) NOT NULL,
         description TEXT ,
@@ -37,7 +37,7 @@ export const createRestaurantTable = async () => {
 
         CONSTRAINT fk_owner_id
         FOREIGN KEY (owner_id)
-        REFERENCES "user"(id),
+        REFERENCES users(id)
     )`
 
     try {
@@ -90,20 +90,20 @@ export const updateRestaurantStatus = async (id: string, isOpen: boolean) => {
     }
 };
 
-export const updateRestaurantContactDetails = async ( id: string, emailId: string, phoneNo: string, status: 'Active' | 'Inactive', opening_time: number, closing_time: number ) => {
+export const updateRestaurantContactDetails = async ( id: string, emailId: string, phoneNo: string, status: 'Active' | 'Inactive', opening_time: string, closing_time: string ) => {
     const query = `
         UPDATE restaurant 
         SET email_id = $1,
         phone_no = $2,
         status = $3,
         opening_time = $4,
-
+        closing_time = $5,
         updated_at = CURRENT_TIMESTAMP
-        WHERE id = $3
+        WHERE id = $6
         RETURNING id, restaurant_name, email_id, phone_no;
     `;
     try {
-        const res = await Query(query, [emailId, phoneNo, id]);
+        const res = await Query(query, [emailId, phoneNo, status, opening_time, closing_time, id]);
         return res.rows[0] || null;
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Database error in updateRestaurantContactDetails";
