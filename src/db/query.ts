@@ -1,6 +1,6 @@
 import pool from "./db.ts";
 
-const Query = async ( text: string, params: (string | number | boolean | Date)[] ) => {
+const Query = async ( text: string, params: (string | number | boolean | Date | null)[] ) => {
 
     const startTime = Date.now();
     try {
