@@ -24,7 +24,7 @@ const generateRefreshToken = (userId : string, sessionId : string, email: string
         throw new AppError("No env file found", 500)
     }
     return jwt.sign({
-            user_id: userId,
+            userId: userId,
             email: email,
             name: name,
             sessionId: sessionId
@@ -54,7 +54,9 @@ const generateCsrfToken = ( token : string, key : string ) => {
         return csrfToken
 }
 
-const isCsrfTokenValid = ( csrfHeader : string, csrfCookie : string, csrf_secret : string , token : string ) => {
+const isCsrfTokenValid = ( csrfHeader: string | undefined, csrfCookie: string | undefined, csrf_secret: string, token: string ) => {
+    if (!csrfHeader || !csrfCookie) return false;
+
     const expectedCsrfToken = crypto
             .createHmac("sha256", csrf_secret)
             .update( token )
