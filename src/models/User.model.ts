@@ -29,7 +29,7 @@ export interface CreateUser {
 }
 
 export interface UpdatePassword {
-    id: string,
+    id: string;
     password: string;
 }
 
@@ -53,3 +53,5 @@ export interface JwtTokenPayload {
     email: string;
     name: string;
 }
+
+export interface tempUser {}

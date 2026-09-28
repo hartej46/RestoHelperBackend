@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 
-const errorHandler = (error: any, req: Request, res: Response ) => {
+const errorHandler = (error: any, req: Request, res: Response) => {
     const statusCode = error.statusCode || 500;
 
     return res.status(statusCode).json({

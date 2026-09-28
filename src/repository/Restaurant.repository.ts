@@ -1,5 +1,5 @@
-import  Query  from '../db/query.ts';
-import AppError from '../utils/error.ts';
+import Query from "../db/query.ts";
+import AppError from "../utils/error.ts";
 
 export const createRestaurantTable = async () => {
     const createTypeRestaurantStatus = `
@@ -38,37 +38,42 @@ export const createRestaurantTable = async () => {
         CONSTRAINT fk_owner_id
         FOREIGN KEY (owner_id)
         REFERENCES users(id)
-    )`
+    )`;
 
     try {
         await Query(createTypeRestaurantStatus, []);
         await Query(createTableQuery, []);
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Something went wrong in createRestaurantTable()";
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong in createRestaurantTable()";
         throw new AppError(errorMessage, 500);
     }
 };
 
 export const getRestaurantById = async (id: string) => {
     const query = `SELECT * FROM restaurant WHERE id = $1;`;
-    
+
     try {
         const res = await Query(query, [id]);
         return res.rows[0] || null;
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Database error in getRestaurantById";
+        const errorMessage =
+            error instanceof Error ? error.message : "Database error in getRestaurantById";
         throw new AppError(errorMessage, 500);
     }
 };
 
 export const getRestaurantsByOwnerId = async (ownerId: string) => {
     const query = `SELECT * FROM restaurant WHERE owner_id = $1 ORDER BY created_at DESC;`;
-    
+
     try {
         const res = await Query(query, [ownerId]);
         return res.rows;
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Database error in getRestaurantsByOwnerId";
+        const errorMessage =
+            error instanceof Error ? error.message : "Database error in getRestaurantsByOwnerId";
         throw new AppError(errorMessage, 500);
     }
 };
@@ -80,17 +85,25 @@ export const updateRestaurantStatus = async (id: string, isOpen: boolean) => {
         WHERE id = $2
         RETURNING id, restaurant_name, is_open;
     `;
-    
+
     try {
         const res = await Query(query, [isOpen, id]);
         return res.rows[0] || null;
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Database error in updateRestaurantStatus";
+        const errorMessage =
+            error instanceof Error ? error.message : "Database error in updateRestaurantStatus";
         throw new AppError(errorMessage, 500);
     }
 };
 
-export const updateRestaurantContactDetails = async ( id: string, emailId: string, phoneNo: string, status: 'Active' | 'Inactive', opening_time: string, closing_time: string ) => {
+export const updateRestaurantContactDetails = async (
+    id: string,
+    emailId: string,
+    phoneNo: string,
+    status: "Active" | "Inactive",
+    opening_time: string,
+    closing_time: string
+) => {
     const query = `
         UPDATE restaurant 
         SET email_id = $1,
@@ -106,7 +119,10 @@ export const updateRestaurantContactDetails = async ( id: string, emailId: strin
         const res = await Query(query, [emailId, phoneNo, status, opening_time, closing_time, id]);
         return res.rows[0] || null;
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Database error in updateRestaurantContactDetails";
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Database error in updateRestaurantContactDetails";
         throw new AppError(errorMessage, 500);
     }
 };

@@ -1,5 +1,5 @@
-import  Query  from '../db/query.ts';
-import AppError from '../utils/error.ts';
+import Query from "../db/query.ts";
+import AppError from "../utils/error.ts";
 
 export const createSessionTable = async () => {
     const query = `CREATE TABLE IF NOT EXISTS sessions(
@@ -34,8 +34,11 @@ export const createSessionTable = async () => {
 
     try {
         await Query(query, []);
-    } catch ( error: unknown ) {
-        const errorMessage = error instanceof Error ? error.message : "Something went wrong while creating table sessions";
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while creating table sessions";
         throw new AppError(errorMessage, 500);
     }
 };
@@ -63,42 +66,56 @@ export const createSession = async (
             user_agent,
             device_name,
             csrf_secret,
-            expires_at
-        ])
+            expires_at,
+        ]);
         return res.rows[0] || null;
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Something went wrong while inserting values in table sessions";
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while inserting values in table sessions";
         throw new AppError(errorMessage, 500);
     }
 };
 
-export const getSessionByUserId = async ( users_id : string ) => {
+export const getSessionByUserId = async (users_id: string) => {
     const query = `SELECT * FROM sessions WHERE users_id = $1 ORDER BY created_at DESC;`;
 
     try {
-        const res = await Query(query, [ users_id ]);
+        const res = await Query(query, [users_id]);
         return res.rows;
-    } catch ( error : unknown ) {
-        const errorMessage = error instanceof Error ? error.message : "Something went wrong while getting values in table sessions";
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while getting values in table sessions";
         throw new AppError(errorMessage, 500);
     }
-}
+};
 
-export const getSessionById = async ( id: string, users_id?: string ) => {
+export const getSessionById = async (id: string, users_id?: string) => {
     const query = users_id
         ? `SELECT * FROM sessions WHERE id = $1 AND users_id = $2;`
         : `SELECT * FROM sessions WHERE id = $1;`;
 
     try {
         const res = await Query(query, users_id ? [id, users_id] : [id]);
-        return res.rows[0] || null
-    } catch ( error : unknown ) {
-        const errorMessage = error instanceof Error ? error.message : "Something went wrong while getting values in table sessions";
+        return res.rows[0] || null;
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while getting values in table sessions";
         throw new AppError(errorMessage, 500);
     }
-}
+};
 
-export const updateSessionById = async ( id: string, users_id: string, csrf_secret: string, expires_at: Date ) => {
+export const updateSessionById = async (
+    id: string,
+    users_id: string,
+    csrf_secret: string,
+    expires_at: Date
+) => {
     const query = `UPDATE sessions SET csrf_secret = $1,
         expires_at = $2,
         last_used_at = CURRENT_TIMESTAMP,
@@ -108,15 +125,18 @@ export const updateSessionById = async ( id: string, users_id: string, csrf_secr
     `;
 
     try {
-        const res = await Query(query, [ csrf_secret, expires_at, id, users_id ]);
+        const res = await Query(query, [csrf_secret, expires_at, id, users_id]);
         return res.rows[0] || null;
-    } catch ( error : unknown ) {
-        const errorMessage = error instanceof Error ? error.message : "Something went wrong while updating values in table sessions";
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while updating values in table sessions";
         throw new AppError(errorMessage, 500);
     }
-}
+};
 
-export const revokeSessionById = async ( id: string, users_id: string, reason = 'logout' ) => {
+export const revokeSessionById = async (id: string, users_id: string, reason = "logout") => {
     const query = `UPDATE sessions
         SET revoked_at = CURRENT_TIMESTAMP,
             revoked_reason = $1,
@@ -128,7 +148,8 @@ export const revokeSessionById = async ( id: string, users_id: string, reason = 
         const res = await Query(query, [reason, id, users_id]);
         return res.rows[0] || null;
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Something went wrong while revoking session";
+        const errorMessage =
+            error instanceof Error ? error.message : "Something went wrong while revoking session";
         throw new AppError(errorMessage, 500);
     }
 };

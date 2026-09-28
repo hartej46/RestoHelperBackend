@@ -8,11 +8,15 @@ const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
         user: gmailUser ?? "",
-        pass: gmailAppPassword ?? ""
-    }
+        pass: gmailAppPassword ?? "",
+    },
 });
 
-const sendOtpEmail = async ( recipientEmail: string, otp: number, expiresInMinutes: number ): Promise<void> => {
+const sendOtpEmail = async (
+    recipientEmail: string,
+    otp: number,
+    expiresInMinutes: number
+): Promise<void> => {
     if (!gmailUser || !gmailAppPassword) {
         throw new AppError("Gmail credentials are not configured", 500);
     }
@@ -49,12 +53,13 @@ const sendOtpEmail = async ( recipientEmail: string, otp: number, expiresInMinut
                             </td>
                         </tr>
                     </table>
-                </div>`
+                </div>`,
         });
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error
-            ? error.message
-            : "Something went wrong while sending the OTP email";
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while sending the OTP email";
         throw new AppError(errorMessage, 500);
     }
 };

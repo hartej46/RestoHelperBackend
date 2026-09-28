@@ -7,5 +7,11 @@ export const CreateUserSchema = z.object({
     password: z.string().min(8, "Password must be at least 8 characters long"),
 });
 
+export const validateOtpSchema = z.object({
+    email: z.string().email("Invalid email address").toLowerCase(),
+    otp: z.string().regex(/^\d{6}$/, "OTP must be exactly 6 digits")
+})
+
 export type requestBodyCreateUser = z.infer<typeof CreateUserSchema>;
 
+export type requestBodyValidateOtp = z.infer<typeof validateOtpSchema>
