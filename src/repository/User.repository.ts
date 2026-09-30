@@ -1,6 +1,7 @@
 import Query from "../db/query.ts";
 import AppError from "../utils/error.ts";
 import { hashPassword } from "../utils/password.ts";
+import type { PoolClient } from "pg";
 
 /**
  * Creates user Postgres SQL schema required for user;
@@ -46,7 +47,7 @@ export const createUser = async (
     const hashedPassword = await hashPassword(password);
     const query = `INSERT INTO users(name, phone_no, email, password, verified)
         VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, name, phone_no, email, verified, created_at;
+        RETURNING id, name, phone_no, email, verified, updated_at, last_login, created_at;
     `;
 
     try {
@@ -114,18 +115,33 @@ export const deleteUser = async (id: string) => {
     }
 };
 
-export const getUserByEmailWithPassword = async (email: string) => {
-    const query = `SELECT * FROM users WHERE email = $1;`;
+export const getUserByEmailPhoneWithPassword = async (email?: string , phone_no?: string) => {
+    const isEmail = Boolean(email);
+    const identifier = isEmail ? email : phone_no;
+    const column = isEmail ? "email" : "phone_no";
+    const query = `SELECT * FROM users WHERE ${column} = $1 LIMIT 1;`;
     try {
-        const res = await Query(query, [email]);
-        return res.rows[0] || null;
+        const res = await Query(query, [identifier!]);     // it is guaranteed that any one of this is present
+        return res.rows[0] ?? null;
     } catch (error: unknown) {
         const errorMessage =
             error instanceof Error
                 ? error.message
-                : "Something went wrong while getting details with email";
+                : `Something went wrong while fetching user by ${column}.`;
         throw new AppError(errorMessage, 500);
     }
+};
+
+export const updateUserLoginWithClient = async (client: PoolClient, id: string) => {
+    const query = `UPDATE users
+        SET last_login = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING id, name, phone_no, email, verified, updated_at, last_login, created_at;
+    `;
+
+    const res = await client.query(query, [id]);
+    return res.rows[0] || null;
 };
 
 export const updatePassword = async (id: string, password: string) => {

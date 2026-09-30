@@ -1,5 +1,6 @@
 import Query from "../db/query.ts";
 import AppError from "../utils/error.ts";
+import type { PoolClient } from "pg";
 
 export const createSessionTable = async () => {
     const query = `CREATE TABLE IF NOT EXISTS sessions(
@@ -76,6 +77,35 @@ export const createSession = async (
                 : "Something went wrong while inserting values in table sessions";
         throw new AppError(errorMessage, 500);
     }
+};
+
+export const createSessionWithClient = async (
+    client: PoolClient,
+    users_id: string,
+    ip_address: string,
+    csrf_secret: string,
+    expires_at: Date,
+    user_agent: string | null = null,
+    device_name: string | null = null
+) => {
+    const query = `
+        INSERT INTO sessions(
+            users_id, ip_address, user_agent, device_name, csrf_secret, expires_at
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6
+        ) RETURNING *;
+    `;
+
+    const res = await client.query(query, [
+        users_id,
+        ip_address,
+        user_agent,
+        device_name,
+        csrf_secret,
+        expires_at,
+    ]);
+
+    return res.rows[0] || null;
 };
 
 export const getSessionByUserId = async (users_id: string) => {
