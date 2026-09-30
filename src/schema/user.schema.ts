@@ -12,6 +12,27 @@ export const validateOtpSchema = z.object({
     otp: z.string().regex(/^\d{6}$/, "OTP must be exactly 6 digits")
 })
 
+export const resetPasswordOtpSchema = z.object({
+    email: z.string().email("Invalid email address").toLowerCase(),
+});
+
+export const resetPasswordSchema = z.object({
+    email: z.string().email("Invalid email address").toLowerCase(),
+    otp: z.string().regex(/^\d{6}$/, "OTP must be exactly 6 digits"),
+    password: z.string().min(8, "Password must be at least 8 characters long"),
+});
+
+export const validateLoginSchema = z.object({
+    email: z.string().trim().email("Invalid email address").toLowerCase().optional(),
+    phoneNumber: z.string().trim().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone number").optional(),
+
+    password: z.string().min(8, "Password must be at least 8 characters long"),
+})
+.refine((data) => data.email || data.phoneNumber, {
+    message: "You must provide either an email or a phone number to log in",
+    path: ["email"],
+});
+
 export type requestBodyCreateUser = z.infer<typeof CreateUserSchema>;
 
-export type requestBodyValidateOtp = z.infer<typeof validateOtpSchema>
+export type requestBodyLogin = z.infer<typeof validateLoginSchema>;;
