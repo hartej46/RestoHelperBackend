@@ -1,10 +1,16 @@
+import client from "../db/redis";
 import redisClient from "../db/redis";
 import AppError from "../utils/error";
+import { CreateUser as newUserModel } from "../models/User.model";
+
+interface newUserModelWithOTP extends newUserModel {
+    otp: string;
+}
 
 type RedisHashValue = string | number | boolean;
 type RedisHash = Record<string, RedisHashValue>;
 
-const setRedisHash = async (
+export const setRedisHash = async (
     key: string,
     data: RedisHash,
     expiresInSeconds: number
@@ -31,4 +37,10 @@ const setRedisHash = async (
     }
 };
 
-export default setRedisHash;
+export const getRedisHash = async (key: string) => {
+    const data = await client.hGetAll(key);
+    if (!data || Object.keys(data).length == 0)
+        throw new AppError("No such user found please try again later", 404);
+
+    return data as unknown as newUserModelWithOTP;
+};
