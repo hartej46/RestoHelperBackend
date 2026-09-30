@@ -3,19 +3,25 @@ import AppError from "../utils/error.ts";
 import {
     requestBodyCreateUser,
     validateOtpSchema,
-    validateLoginSchema
+    validateLoginSchema,
+    resetPasswordOtpSchema,
+    resetPasswordSchema,
 } from "../schema/user.schema.ts";
-import { User } from "../models/User.model.ts";
-import { getUserByEmail, getUserByPhoneNumber, createUser } from "../repository/User.repository.ts";
+import { User, UserWithPassword } from "../models/User.model.ts";
+import { getUserByEmail, getUserByPhoneNumber, createUser, getUserByEmailPhoneWithPassword, updatePassword } from "../repository/User.repository.ts";
 import redisKeyGenerator from "../redis/redisKeyGenerator.ts";
-import { setRedisHash, getRedisHash } from "../redis/redisHash.ts";
+import { setRedisHash, getRedisHash} from "../redis/redisHash.ts";
 import { hashPassword } from "../utils/password.ts";
-import sendOtpEmail from "../utils/emailSender.ts";
+import sendOtpEmail, { sendPasswordResetOtpEmail } from "../utils/emailSender.ts";
 import { generateAccessToken, generateRefreshToken, generateCsrfToken } from "../utils/token.ts";
 import { createSession } from "../repository/Session.repository.ts";
 import crypto from "node:crypto";
 import { Session } from "../models/Session.model.ts";
 import { csrfTokenOptions, refreshTokenOption } from "../constant.ts";
+import { verifyPassword } from "../utils/password.ts";
+import { withTransaction } from "../db/db.ts";
+import { createSessionWithClient } from "../repository/Session.repository.ts";
+import { updateUserLoginWithClient } from "../repository/User.repository.ts";
 
 const newUserSignUp = asyncHandler(async (req, res) => {
     const body: requestBodyCreateUser = req.body;
@@ -111,5 +117,58 @@ const validateOtp = asyncHandler(async (req, res) => {
         success: true,
         message: "New User created successfully",
         user: newUser,
+    });
+});
+
+const loginUser = asyncHandler(async (req, res) => {
+    const validatedBody = validateLoginSchema.safeParse(req.body);
+
+    if (!validatedBody.success) throw new AppError(validatedBody.error.message, 401);
+
+    const email = validatedBody.data.email;
+    const phone_no = validatedBody.data.phoneNumber;
+    const password = validatedBody.data.password;
+
+    const userData: UserWithPassword = await getUserByEmailPhoneWithPassword(email, phone_no);
+
+    if (!userData) throw new AppError("No user found with this email", 401);
+
+    const isPasswordValid = await verifyPassword(password, userData.password);
+    if (!isPasswordValid) throw new AppError("Password is not valid, please try again later", 401);
+
+    const csrfSecret = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const userAgent = req.get("user-agent") ?? null;
+
+    const { session, user } = await withTransaction(async (client) => {
+        const session = (await createSessionWithClient(
+            client,
+            userData.id,
+            req.ip!,
+            csrfSecret,
+            expiresAt,
+            userAgent
+        )) as Session;
+
+        const user = await updateUserLoginWithClient(client, userData.id);
+
+        return { session, user };
+    });
+
+    const accessToken = generateAccessToken(user.id, session.id, user.email, user.name);
+    const refreshToken = generateRefreshToken(user.id, session.id, user.email, user.name);
+    const csrfToken = generateCsrfToken(refreshToken, csrfSecret);
+
+    res.set("Authorization", "Bearer " + accessToken);
+    res.cookie("csrfToken", csrfToken, csrfTokenOptions).cookie(
+        "refreshToken",
+        refreshToken,
+        refreshTokenOption
+    );
+
+    return res.status(200).json({
+        success: true,
+        message: "Login successful",
+        user,
     });
 });
