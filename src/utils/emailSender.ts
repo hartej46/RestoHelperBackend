@@ -64,4 +64,30 @@ const sendOtpEmail = async (
     }
 };
 
+export const sendPasswordResetOtpEmail = async (
+    recipientEmail: string,
+    otp: number,
+    expiresInMinutes: number
+): Promise<void> => {
+    if (!gmailUser || !gmailAppPassword) {
+        throw new AppError("Gmail credentials are not configured", 500);
+    }
+
+    try {
+        await transporter.sendMail({
+            from: gmailUser,
+            to: recipientEmail,
+            subject: "Reset your Restro Helper password",
+            text: `Your Restro Helper password reset code is ${otp}. It expires in ${expiresInMinutes} minutes.`,
+            html: `<p>Your Restro Helper password reset code is <strong>${otp}</strong>.</p><p>It expires in ${expiresInMinutes} minutes.</p>`,
+        });
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while sending the password reset email";
+        throw new AppError(errorMessage, 500);
+    }
+};
+
 export default sendOtpEmail;

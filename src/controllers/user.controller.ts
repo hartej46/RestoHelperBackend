@@ -9,8 +9,8 @@ import {
 } from "../schema/user.schema.ts";
 import { User, UserWithPassword } from "../models/User.model.ts";
 import { getUserByEmail, getUserByPhoneNumber, createUser, getUserByEmailPhoneWithPassword, updatePassword } from "../repository/User.repository.ts";
-import redisKeyGenerator from "../redis/redisKeyGenerator.ts";
-import { setRedisHash, getRedisHash} from "../redis/redisHash.ts";
+import redisKeyGenerator, { passwordResetKeyGenerator } from "../redis/redisKeyGenerator.ts";
+import { setRedisHash, getRedisHash, deleteRedisHash } from "../redis/redisHash.ts";
 import { hashPassword } from "../utils/password.ts";
 import sendOtpEmail, { sendPasswordResetOtpEmail } from "../utils/emailSender.ts";
 import { generateAccessToken, generateRefreshToken, generateCsrfToken } from "../utils/token.ts";
@@ -172,3 +172,54 @@ const loginUser = asyncHandler(async (req, res) => {
         user,
     });
 });
+
+const resetPasswordOtp = asyncHandler(async (req, res) => {
+    const validatedBody = resetPasswordOtpSchema.safeParse(req.body);
+
+    if (!validatedBody.success) {
+        throw new AppError(validatedBody.error.issues[0].message, 400);
+    }
+
+    const email = validatedBody.data.email;
+    const user = await getUserByEmail(email);
+
+    if (user) {
+        const otp = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+        const expiresInMinutes = 5;
+        const resetKey = passwordResetKeyGenerator(email);
+
+        await setRedisHash(resetKey, { email, otp }, expiresInMinutes * 60);
+        await sendPasswordResetOtpEmail(email, otp, expiresInMinutes);
+    }
+
+    return res.status(200).json({
+        success: true,
+        message: "If an account exists with this email, a password reset OTP was sent",
+    });
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+    const validatedBody = resetPasswordSchema.safeParse(req.body);
+
+    if (!validatedBody.success) {
+        throw new AppError(validatedBody.error.issues[0].message, 400);
+    }
+
+    const { email, otp, password } = validatedBody.data;
+    const resetKey = passwordResetKeyGenerator(email);
+    const resetData = await getRedisHash(resetKey);
+
+    if (String(otp) !== resetData.otp) throw new AppError("Invalid OTP", 401);
+
+    const user = await getUserByEmail(email);
+    if (!user) throw new AppError("No user found with this email", 404);
+
+    await updatePassword(user.id, password);
+    await deleteRedisHash(resetKey);
+
+    return res.status(200).json({
+        success: true,
+        message: "Password reset successfully",
+    });
+});
+

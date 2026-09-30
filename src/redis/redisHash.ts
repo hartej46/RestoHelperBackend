@@ -44,3 +44,15 @@ export const getRedisHash = async (key: string) => {
 
     return data as unknown as newUserModelWithOTP;
 };
+
+export const deleteRedisHash = async (key: string): Promise<void> => {
+    try {
+        await redisClient.del(key);
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while deleting data from Redis";
+        throw new AppError(errorMessage, 500);
+    }
+};
