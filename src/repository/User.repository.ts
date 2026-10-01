@@ -44,14 +44,13 @@ export const createUser = async (
     password: string,
     verified: boolean
 ) => {
-    const hashedPassword = await hashPassword(password);
     const query = `INSERT INTO users(name, phone_no, email, password, verified)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id, name, phone_no, email, verified, updated_at, last_login, created_at;
     `;
 
     try {
-        const res = await Query(query, [name, phone_no, email, hashedPassword, verified]);
+        const res = await Query(query, [name, phone_no, email, password, verified]);
         return res.rows[0] || null;
     } catch (error: unknown) {
         const errorMessage =
