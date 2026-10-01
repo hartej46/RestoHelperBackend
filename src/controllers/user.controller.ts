@@ -13,6 +13,7 @@ import redisKeyGenerator, { passwordResetKeyGenerator } from "../redis/redisKeyG
 import { setRedisHash, getRedisHash, deleteRedisHash } from "../redis/redisHash.ts";
 import { hashPassword } from "../utils/password.ts";
 import sendOtpEmail, { sendPasswordResetOtpEmail } from "../utils/emailSender.ts";
+import sendOtpWhatsApp from "../utils/whatsappSender.ts";
 import { generateAccessToken, generateRefreshToken, generateCsrfToken } from "../utils/token.ts";
 import { createSession } from "../repository/Session.repository.ts";
 import crypto from "node:crypto";
@@ -40,20 +41,23 @@ const newUserSignUp = asyncHandler(async (req, res) => {
 
     const redisKey = redisKeyGenerator(email);
     const hashedPassword = await hashPassword(password);
-    const otp = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+    const emailOtp = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+    const whatsappOtp = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
 
     const data = {
         name: name,
         email: email,
         password: hashedPassword,
         phone_no: phone_no,
-        otp: otp,
+        emailOtp: emailOtp,
+        whatsappOtp: whatsappOtp,
     };
 
     const expiresInMinutes = 5;
     const expiresInSeconds = expiresInMinutes * 60;
     await setRedisHash(redisKey, data, expiresInSeconds);
-    await sendOtpEmail(email, otp, expiresInMinutes);
+    await sendOtpEmail(email, emailOtp, expiresInMinutes);
+    await sendOtpWhatsApp(phone_no, whatsappOtp, expiresInMinutes);
 
     return res.status(201).json({
         success: true,
@@ -69,12 +73,15 @@ const validateOtp = asyncHandler(async (req, res) => {
     }
 
     const email = validatedBody.data.email;
-    const otp = validatedBody.data.otp;
+    const emailOtp = validatedBody.data.emailOtp;
+    const whatsappOtp = validatedBody.data.whatsappOtp;
 
     const redisKey = redisKeyGenerator(email);
     const userData = await getRedisHash(redisKey);
 
-    if (otp != userData.otp) throw new AppError("Invalid OTP", 401);
+    if (emailOtp !== userData.emailOtp || whatsappOtp !== userData.whatsappOtp) {
+        throw new AppError("Invalid OTP", 401);
+    }
 
     const newUser = (await createUser(
         userData.name,
