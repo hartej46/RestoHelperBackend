@@ -4,7 +4,9 @@ import AppError from "../utils/error";
 import { CreateUser as newUserModel } from "../models/User.model";
 
 interface newUserModelWithOTP extends newUserModel {
-    otp: string;
+    otp?: string;
+    emailOtp?: string;
+    whatsappOtp?: string;
 }
 
 type RedisHashValue = string | number | boolean;
@@ -14,7 +16,7 @@ export const setRedisHash = async (
     key: string,
     data: RedisHash,
     expiresInSeconds: number
-): Promise<void> => {
+) => {
     if (!key.trim()) throw new Error("Redis key is required");
 
     if (!Number.isInteger(expiresInSeconds) || expiresInSeconds <= 0) {
