@@ -183,3 +183,21 @@ export const revokeSessionById = async (id: string, users_id: string, reason = "
         throw new AppError(errorMessage, 500);
     }
 };
+
+export const revokeAllSessions = async (users_id: string, reason = "logout_all") => {
+    const query = `UPDATE sessions
+        SET revoked_at = CURRENT_TIMESTAMP,
+            revoked_reason = $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE users_id = $2 AND revoked_at IS NULL
+        RETURNING *;`;
+
+    try {
+        const res = await Query(query, [reason, users_id]);
+        return res.rows;
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error ? error.message : "Something went wrong while revoking sessions";
+        throw new AppError(errorMessage, 500);
+    }
+};
