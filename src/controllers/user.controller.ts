@@ -8,7 +8,15 @@ import {
     resetPasswordSchema,
 } from "../schema/user.schema.ts";
 import { User, UserWithPassword } from "../models/User.model.ts";
-import { getUserByEmail, getUserByPhoneNumber, createUser, getUserByEmailPhoneWithPassword, updatePassword } from "../repository/User.repository.ts";
+import {
+    getUserByEmail,
+    getUserByPhoneNumber,
+    createUser,
+    getUserByEmailPhoneWithPassword,
+    updatePassword,
+    updatePhoneNumber,
+    updateEmail,
+} from "../repository/User.repository.ts";
 import redisKeyGenerator, { passwordResetKeyGenerator } from "../redis/redisKeyGenerator.ts";
 import { setRedisHash, getRedisHash, deleteRedisHash } from "../redis/redisHash.ts";
 import { hashPassword } from "../utils/password.ts";
@@ -230,3 +238,83 @@ const resetPassword = asyncHandler(async (req, res) => {
     });
 });
 
+const updateUserPhoneNumber = asyncHandler(async (req, res) => {
+    const user = (req as typeof req & { user?: User }).user;
+    if (!user) throw new AppError("Authentication is required", 401);
+
+    const phone_no = req.body.phone_no?.trim();
+    const otp = req.body.otp?.trim();
+
+    if (!phone_no || !/^\+?[1-9]\d{1,14}$/.test(phone_no)) {
+        throw new AppError("Invalid phone number format", 400);
+    }
+
+    const existingUser = await getUserByPhoneNumber(phone_no);
+    if (existingUser && String(existingUser.id) !== String(user.id)) {
+        throw new AppError("User already exists using this phone number", 400);
+    }
+
+    const redisKey = `phone-update:${user.id}`;
+
+    if (!otp) {
+        const whatsappOtp = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+        await setRedisHash(redisKey, { phone_no, otp: whatsappOtp }, 5 * 60);
+        await sendOtpWhatsApp(phone_no, whatsappOtp, 5);
+
+        return res.status(200).json({
+            success: true,
+            message: "WhatsApp OTP was sent successfully",
+        });
+    }
+
+    if (!/^\d{6}$/.test(otp)) throw new AppError("OTP must be exactly 6 digits", 400);
+
+    const phoneUpdateData = await getRedisHash(redisKey);
+    if (phoneUpdateData.phone_no !== phone_no || phoneUpdateData.otp !== otp) {
+        throw new AppError("Invalid OTP", 401);
+    }
+
+    const updatedUser = await updatePhoneNumber(user.id, phone_no);
+    await deleteRedisHash(redisKey);
+
+    return res.status(200).json({
+        success: true,
+        message: "Phone number updated successfully",
+        user: updatedUser,
+    });
+});
+
+const updateUserEmail = asyncHandler(async (req, res) => {
+    const user = (req as typeof req & { user?: User }).user;
+    if (!user) throw new AppError("Authentication is required", 401);
+
+    const email = req.body.email?.trim().toLowerCase();
+    const validatedEmail = resetPasswordOtpSchema.safeParse({ email });
+
+    if (!validatedEmail.success) {
+        throw new AppError(validatedEmail.error.issues[0].message, 400);
+    }
+
+    const existingUser = await getUserByEmail(email);
+    if (existingUser && String(existingUser.id) !== String(user.id)) {
+        throw new AppError("User already exists using this email", 400);
+    }
+
+    const updatedUser = await updateEmail(user.id, email);
+
+    return res.status(200).json({
+        success: true,
+        message: "Email updated successfully",
+        user: updatedUser,
+    });
+});
+
+export {
+    newUserSignUp,
+    validateOtp,
+    loginUser,
+    resetPasswordOtp,
+    resetPassword,
+    updateUserPhoneNumber,
+    updateUserEmail,
+};
