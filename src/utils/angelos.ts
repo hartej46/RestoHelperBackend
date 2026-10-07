@@ -11,6 +11,14 @@ const redisStorage = {
     async set(key: string, value: string, expiresAt: number) {
         await redisClient.set(key, value, { PXAT: expiresAt });
     },
+    async setIfAbsent(key: string, value: string, expiresInSeconds: number) {
+        const result = await redisClient.set(key, value, {
+            NX: true,
+            EX: expiresInSeconds,
+        });
+
+        return result === "OK";
+    },
     async delete(key: string) {
         await redisClient.del(key);
     },
