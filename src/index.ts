@@ -4,6 +4,7 @@ import { connectDB } from "./db/db.ts";
 import { createTableUser } from "./repository/User.repository.ts";
 import { createSessionTable } from "./repository/Session.repository.ts";
 import { createRestaurantTable } from "./repository/Restaurant.repository.ts";
+import { connectRedis } from "./db/redis.ts";
 
 const PORT = process.env.PORT || 8000;
 
@@ -17,6 +18,7 @@ const initDB = async () => {
 (async () => {
     try {
         await connectDB();
+        await connectRedis();
         await initDB();
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
