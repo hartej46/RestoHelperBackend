@@ -6,10 +6,7 @@ const phoneVerificationTtl = 180;
 const redisStorage = {
     async get(key: string) {
         const value = await redisClient.get(key);
-        return typeof value === "string" ? value : "";
-    },
-    async set(key: string, value: string, expiresAt: number) {
-        await redisClient.set(key, value, { PXAT: expiresAt });
+        return typeof value === "string" ? value : null;
     },
     async setIfAbsent(key: string, value: string, expiresInSeconds: number) {
         const result = await redisClient.set(key, value, {
@@ -20,7 +17,7 @@ const redisStorage = {
         return result === "OK";
     },
     async delete(key: string) {
-        await redisClient.del(key);
+        return (await redisClient.del(key)) > 0;
     },
 };
 

@@ -37,7 +37,8 @@ export const createTableUser = async () => {
     }
 };
 
-export const createUser = async (
+export const createUserWithClient = async (
+    client: PoolClient,
     name: string,
     phone_no: string,
     email: string,
@@ -49,14 +50,8 @@ export const createUser = async (
         RETURNING id, name, phone_no, email, verified, updated_at, last_login, created_at;
     `;
 
-    try {
-        const res = await Query(query, [name, phone_no, email, password, verified]);
-        return res.rows[0] || null;
-    } catch (error: unknown) {
-        const errorMessage =
-            error instanceof Error ? error.message : "Something went wrong while creating new user";
-        throw new AppError(errorMessage, 500);
-    }
+    const res = await client.query(query, [name, phone_no, email, password, verified]);
+    return res.rows[0] || null;
 };
 
 export const getUserDetailsById = async (id: string) => {
