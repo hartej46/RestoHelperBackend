@@ -47,6 +47,28 @@ export interface UserId {
     id: string;
 }
 
+export type SignupRegistrationStatus =
+    | "EMAIL_PENDING"
+    | "PHONE_PENDING"
+    | "PHONE_VERIFIED"
+    | "COMPLETED"
+    | "EXPIRED"
+    | "FAILED";
+
+export interface SignupRegistration {
+    registrationId: string;
+    name: string;
+    email: string;
+    phone_no: string;
+    password: string;
+    emailOtp: string;
+    emailVerified: boolean;
+    phoneVerified: boolean;
+    phoneSessionId?: string;
+    status: SignupRegistrationStatus;
+    createdAt: string;
+}
+
 export interface JwtTokenPayload {
     userId: string;
     sessionId: string;
