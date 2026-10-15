@@ -12,7 +12,7 @@ import {
     resetPasswordOtpSchema,
     resetPasswordSchema,
 } from "../schema/user.schema.ts";
-import { JwtTokenPayload, User, UserWithPassword } from "../models/User.model.ts";
+import { User, UserWithPassword } from "../models/User.model.ts";
 import {
     getUserByEmail,
     getUserByPhoneNumber,
@@ -29,11 +29,7 @@ import { setRedis, getRedis, deleteRedis } from "../redis/redisHash.ts";
 import redisClient from "../db/redis.ts";
 import { hashPassword } from "../utils/password.ts";
 import sendOtpEmail, { sendPasswordResetOtpEmail } from "../utils/emailSender.ts";
-import {
-    generateAccessToken,
-    generateRefreshToken,
-    generateCsrfToken,
-} from "../utils/token.ts";
+import { generateAccessToken, generateRefreshToken, generateCsrfToken } from "../utils/token.ts";
 import {
     createSession,
     revokeAllSessions,
@@ -46,8 +42,12 @@ import { verifyPassword } from "../utils/password.ts";
 import { withTransaction } from "../db/db.ts";
 import { createSessionWithClient } from "../repository/Session.repository.ts";
 import { updateUserLoginWithClient } from "../repository/User.repository.ts";
-import { getSessionIdFromRequest, getAuthenticatedUser, clearAuthenticationCookies } from "../services/user.service.ts";
-import { CreateSessionConfig } from "angelos";
+import {
+    getSessionIdFromRequest,
+    getAuthenticatedUser,
+    clearAuthenticationCookies,
+} from "../services/user.service.ts";
+import type { CreateSessionConfig } from "angelos";
 
 const newUserSignUp = asyncHandler(async (req, res) => {
     const body: requestBodyCreateUser = req.body;
@@ -74,7 +74,7 @@ const newUserSignUp = asyncHandler(async (req, res) => {
         password: hashedPassword,
         phone_no: phone_no,
         emailOtp: emailOtp,
-        emailVerified : false
+        emailVerified: false,
     };
 
     const expiresInMinutes = 5;
@@ -101,35 +101,42 @@ const validateEmailOtp = asyncHandler(async (req, res) => {
     const redisKey = redisKeyGenerator(email);
     const userData = await getRedis(redisKey);
 
-    if (emailOtp !== userData.emailOtp ) {
+    if (emailOtp !== String(userData.emailOtp)) {
+        console.log(emailOtp, userData.emailOtp);
         throw new AppError("Invalid OTP", 401);
     }
 
     const updatedUserData = {
         ...userData,
-        emailVerified: true
-    }
+        emailVerified: true,
+    };
 
     const expiresInSeconds = 5 * 60;
-    
+
     await setRedis(redisKey, JSON.stringify(updatedUserData), expiresInSeconds);
 
-    const config : CreateSessionConfig = {
-        phoneNumber: updatedUserData.phone_no
+    const config: CreateSessionConfig = {
+        phoneNumber: updatedUserData.phone_no,
     };
 
     const session = await whatsappOtpVerifier.createSession(config);
-    await redisClient.set(
-        getPhoneVerificationKey(session.id),
-        JSON.stringify({
-            type: "SIGNUP",
-            status: "PENDING",
-            sessionId: session.id,
-            email: updatedUserData.email,
-            phone_no: updatedUserData.phone_no,
-        }),
-        { EX: phoneVerificationTtl }
-    );
+    const verificationKey = getPhoneVerificationKey(session.id);
+    const verificationData = {
+        type: "SIGNUP" as const,
+        status: "PENDING" as const,
+        sessionId: session.id,
+        email: updatedUserData.email,
+        phone_no: updatedUserData.phone_no,
+    };
+
+    await redisClient.set(verificationKey, JSON.stringify(verificationData), {
+        EX: phoneVerificationTtl,
+    });
+
+    const storedVerification = await redisClient.get(verificationKey);
+    if (!storedVerification) {
+        throw new AppError("Unable to create WhatsApp verification session", 500);
+    }
 
     return res.status(201).json({
         success: true,
@@ -139,13 +146,12 @@ const validateEmailOtp = asyncHandler(async (req, res) => {
             webUrl: session.deepLink,
             qrSvg: session.qrSvg,
             expiresAt: session.expiresAt,
-        }
+        },
     });
-
 });
 
 const getSignupPhoneVerificationEvents = asyncHandler(async (req, res) => {
-    const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
+    const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId.trim() : "";
 
     if (!sessionId) throw new AppError("Session id is required", 400);
 
@@ -160,7 +166,7 @@ const getSignupPhoneVerificationEvents = asyncHandler(async (req, res) => {
         type?: "SIGNUP";
         status: "PENDING" | "VERIFIED";
         sessionId: string;
-        email?: string;
+        userId?: string;
     };
 
     if (verificationData.type !== "SIGNUP" || verificationData.sessionId !== sessionId) {
@@ -175,8 +181,6 @@ const getSignupPhoneVerificationEvents = asyncHandler(async (req, res) => {
 
     let closed = false;
     let interval: NodeJS.Timeout | undefined;
-    let completing = false;
-
     const closeStream = () => {
         if (closed) return;
         closed = true;
@@ -189,110 +193,29 @@ const getSignupPhoneVerificationEvents = asyncHandler(async (req, res) => {
 
         const currentValue = await redisClient.get(key);
         if (typeof currentValue !== "string" || !currentValue) {
-            res.write(`event: expired\ndata: ${JSON.stringify({ success: false, status: "EXPIRED" })}\n\n`);
+            res.write(
+                `event: expired\ndata: ${JSON.stringify({ success: false, status: "EXPIRED" })}\n\n`
+            );
             closeStream();
             return;
         }
 
         const currentData = JSON.parse(currentValue) as typeof verificationData;
         if (currentData.status === "VERIFIED") {
-            if (completing) return;
-            completing = true;
-
-            if (!currentData.email) {
-                res.write(
-                    `event: failed\ndata: ${JSON.stringify({
-                        success: false,
-                        status: "FAILED",
-                        message: "Signup verification data is incomplete",
-                    })}\n\n`
-                );
-                closeStream();
-                return;
-            }
-
-            const lockKey = `${key}:completion-lock`;
-            const lockAcquired = await redisClient.set(lockKey, "1", { NX: true, EX: 30 });
-            if (lockAcquired !== "OK") return;
-
-            try {
-                const signupData = await getRedis(redisKeyGenerator(currentData.email));
-                const csrfSecret = crypto.randomBytes(32).toString("hex");
-                const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-                const userAgent = req.get("user-agent") ?? null;
-
-                const { session, user } = await withTransaction(async (client) => {
-                    const newUser = (await createUserWithClient(
-                        client,
-                        signupData.name,
-                        signupData.phone_no,
-                        signupData.email,
-                        signupData.password,
-                        true
-                    )) as User;
-
-                    const session = (await createSessionWithClient(
-                        client,
-                        newUser.id,
-                        req.ip ?? "0.0.0.0",
-                        csrfSecret,
-                        expiresAt,
-                        userAgent
-                    )) as Session;
-
-                    return { session, user: newUser };
-                });
-
-                const accessToken = generateAccessToken(
-                    user.id,
-                    session.id,
-                    user.email,
-                    user.name
-                );
-                const refreshToken = generateRefreshToken(
-                    user.id,
-                    session.id,
-                    user.email,
-                    user.name
-                );
-                const csrfToken = generateCsrfToken(refreshToken, csrfSecret);
-
-                res.set("Authorization", `Bearer ${accessToken}`);
-                res.cookie("csrfToken", csrfToken, csrfTokenOptions).cookie(
-                    "refreshToken",
-                    refreshToken,
-                    refreshTokenOption
-                );
-
-                await redisClient.set(
-                    key,
-                    JSON.stringify({ ...currentData, status: "COMPLETED" }),
-                    { EX: phoneVerificationTtl }
-                );
-                await redisClient.del(redisKeyGenerator(signupData.email));
-
-                res.write(
-                    `event: verified\ndata: ${JSON.stringify({
-                        success: true,
-                        status: "VERIFIED",
-                        authenticated: true,
-                        user,
-                    })}\n\n`
-                );
-            } catch (error) {
-                res.write(
-                    `event: failed\ndata: ${JSON.stringify({
-                        success: false,
-                        status: "FAILED",
-                        message: error instanceof Error ? error.message : "Signup failed",
-                    })}\n\n`
-                );
-            }
+            res.write(
+                `event: verified\ndata: ${JSON.stringify({
+                    success: true,
+                    status: "VERIFIED",
+                    userId: currentData.userId,
+                })}\n\n`
+            );
             closeStream();
             return;
         }
 
-        res.write(`event: pending\ndata: ${JSON.stringify({ success: true, status: "PENDING" })}\n\n`);
+        res.write(
+            `event: pending\ndata: ${JSON.stringify({ success: true, status: "PENDING" })}\n\n`
+        );
     };
 
     req.on("close", closeStream);
@@ -524,9 +447,10 @@ const getPhoneVerificationStatus = asyncHandler(async (req, res) => {
     }
 
     const verificationData = JSON.parse(verification) as {
-        userId: string;
+        userId?: string;
         phone_no: string;
         status: "PENDING" | "VERIFIED";
+        email?: string;
     };
 
     if (verificationData.userId !== user.id) {
@@ -534,7 +458,7 @@ const getPhoneVerificationStatus = asyncHandler(async (req, res) => {
     }
 
     if (verificationData.status === "VERIFIED") {
-        const updatedUser = await updatePhoneNumber(user.id, verificationData.phone_no);
+        const updatedUser = await getUserDetailsById(user.id);
         await redisClient.del(key);
 
         return res.status(200).json({
@@ -555,7 +479,11 @@ const verifyWhatsAppWebhook = asyncHandler(async (req, res) => {
     const rawBody = (req as typeof req & { rawBody?: Buffer }).rawBody;
     const signature = req.headers["x-hub-signature-256"];
 
-    res.status(200).send("EVENT_RECEIVED");
+    console.info("Received WhatsApp webhook", {
+        hasRawBody: Boolean(rawBody),
+        rawBodyLength: rawBody?.length ?? 0,
+        hasSignature: typeof signature === "string" && signature.length > 0,
+    });
 
     const result = await whatsappOtpVerifier.verifySession({
         rawBody: rawBody!,
@@ -563,46 +491,103 @@ const verifyWhatsAppWebhook = asyncHandler(async (req, res) => {
         jsonData: req.body,
     });
 
-    if (!result.success || !result.parsedData) return;
+    if (!result.success || !result.parsedData) {
+        console.warn("WhatsApp verification rejected", {
+            message: result.message,
+        });
+        return res.status(200).send("EVENT_RECEIVED");
+    }
 
     const sessionId = result.parsedData.text.trim().split(" ")[1];
-    if (!sessionId) return;
+    if (!sessionId) {
+        console.warn("WhatsApp verification message did not contain a session ID");
+        return res.status(200).send("EVENT_RECEIVED");
+    }
 
     const key = getPhoneVerificationKey(sessionId);
     const verification = await redisClient.get(key);
-    if (typeof verification !== "string" || !verification) return;
+    if (typeof verification !== "string" || !verification) {
+        console.warn("WhatsApp verification status record not found", { sessionId });
+        return res.status(200).send("EVENT_RECEIVED");
+    }
 
     const verificationData = JSON.parse(verification) as {
         type?: "SIGNUP" | "PHONE_UPDATE";
-        userId: string;
+        userId?: string;
         phone_no: string;
         status: "PENDING" | "VERIFIED";
+        email?: string;
     };
 
     if (verificationData.type === "SIGNUP") {
+        if (!verificationData.email) {
+            throw new AppError("Signup verification data is incomplete", 400);
+        }
+
+        const signupData = await getRedis(redisKeyGenerator(verificationData.email));
+        const csrfSecret = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const userAgent = req.get("user-agent") ?? null;
+
+        const user = await withTransaction(async (client) => {
+            const newUser = (await createUserWithClient(
+                client,
+                signupData.name,
+                signupData.phone_no,
+                signupData.email,
+                signupData.password,
+                true
+            )) as User;
+
+            await createSessionWithClient(
+                client,
+                newUser.id,
+                req.ip ?? "0.0.0.0",
+                csrfSecret,
+                expiresAt,
+                userAgent
+            );
+
+            return newUser;
+        });
+
         await redisClient.set(
             key,
-            JSON.stringify({ ...verificationData, status: "VERIFIED" }),
-            { EX: phoneVerificationTtl }
+            JSON.stringify({
+                ...verificationData,
+                status: "VERIFIED",
+                userId: user.id,
+            }),
+            {
+                EX: phoneVerificationTtl,
+            }
         );
-        return;
+        await redisClient.del(redisKeyGenerator(signupData.email));
+        return res.status(200).send("EVENT_RECEIVED");
     }
 
     if (verificationData.status === "PENDING") {
-        await redisClient.set(
-            key,
-            JSON.stringify({ ...verificationData, status: "VERIFIED" }),
-            { EX: phoneVerificationTtl }
-        );
+        if (!verificationData.userId) {
+            throw new AppError("Phone verification data is incomplete", 400);
+        }
+
+        await updatePhoneNumber(verificationData.userId, verificationData.phone_no);
+        await redisClient.set(key, JSON.stringify({ ...verificationData, status: "VERIFIED" }), {
+            EX: phoneVerificationTtl,
+        });
     }
+
+    return res.status(200).send("EVENT_RECEIVED");
 });
 
 const verifyWhatsAppWebhookHandshake = asyncHandler(async (req, res) => {
-    const result = whatsappOtpVerifier.handleWebhookVerification(req.query as {
-        "hub.mode": string;
-        "hub.verify_token": string;
-        "hub.challenge": string;
-    });
+    const result = whatsappOtpVerifier.handleWebhookVerification(
+        req.query as {
+            "hub.mode": string;
+            "hub.verify_token": string;
+            "hub.challenge": string;
+        }
+    );
 
     if (!result.success || !result.challenge) return res.sendStatus(403);
 
