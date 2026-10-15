@@ -6,15 +6,17 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "start": "tsx src/index.ts"
   },
   "author": "Hartejsingh Sandhu",
   "license": "MIT",
   "dependencies": {
     "@types/cors": "^2.8.19",
-    "angelos": "^1.0.3",
+    "angelos": "^1.2.1",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
@@ -35,6 +37,7 @@
     "@types/pg": "^8.23.1",
     "electron": "^44.4.5",
     "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
 }
