@@ -10,7 +10,6 @@ export const CreateUserSchema = z.object({
 export const validateOtpSchema = z.object({
     email: z.string().email("Invalid email address").toLowerCase(),
     emailOtp: z.string().regex(/^\d{6}$/, "Email OTP must be exactly 6 digits"),
-    whatsappOtp: z.string().regex(/^\d{6}$/, "WhatsApp OTP must be exactly 6 digits"),
 })
 
 export const resetPasswordOtpSchema = z.object({
