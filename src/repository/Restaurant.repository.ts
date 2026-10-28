@@ -1,5 +1,6 @@
 import Query from "../db/query.ts";
 import AppError from "../utils/error.ts";
+import { CreateRestaurantParams, Restaurant } from "../models/Restaurant.model.ts";
 
 export const createRestaurantTable = async () => {
     const createTypeRestaurantStatus = `
@@ -123,6 +124,56 @@ export const updateRestaurantContactDetails = async (
             error instanceof Error
                 ? error.message
                 : "Database error in updateRestaurantContactDetails";
+        throw new AppError(errorMessage, 500);
+    }
+};
+
+export const createRestaurant = async (data: CreateRestaurantParams): Promise<Restaurant> => {
+    const query = `
+        INSERT INTO restaurant (
+            owner_id,
+            restaurant_name,
+            description,
+            address,
+            phone_no,
+            email_id,
+            opening_time,
+            closing_time,
+            website_url,
+            logo_id,
+            avg_dining_price,
+            more_info,
+            status,
+            is_open
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+        )
+        RETURNING *;
+    `;
+
+    const values = [
+        data.owner_id,
+        data.restaurant_name,
+        data.description || null,
+        data.address,
+        data.phone_no || null,
+        data.email_id,
+        data.opening_time,
+        data.closing_time,
+        data.website_url || null,
+        data.logo_id || null,
+        data.avg_dining_price || null,
+        data.more_info || null,
+        data.status || "Active",
+        data.is_open ?? false,
+    ];
+
+    try {
+        const res = await Query(query, values);
+        return res.rows[0];
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error ? error.message : "Database error in createRestaurant";
         throw new AppError(errorMessage, 500);
     }
 };
