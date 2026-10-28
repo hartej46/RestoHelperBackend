@@ -1,10 +1,7 @@
 import { Request, Response } from "express";
 import AppError from "../utils/error.ts";
 import { JwtTokenPayload, User } from "../models/User.model.ts";
-import {
-    verifyAccessToken,
-    verifyRefreshToken,
-} from "../utils/token.ts";
+import { verifyAccessToken, verifyRefreshToken } from "../utils/token.ts";
 import { csrfTokenOptions, refreshTokenOption } from "../constant.ts";
 
 export const getSessionIdFromRequest = (req: Request) => {
