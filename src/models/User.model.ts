@@ -48,12 +48,7 @@ export interface UserId {
 }
 
 export type SignupRegistrationStatus =
-    | "EMAIL_PENDING"
-    | "PHONE_PENDING"
-    | "PHONE_VERIFIED"
-    | "COMPLETED"
-    | "EXPIRED"
-    | "FAILED";
+    "EMAIL_PENDING" | "PHONE_PENDING" | "PHONE_VERIFIED" | "COMPLETED" | "EXPIRED" | "FAILED";
 
 export interface SignupRegistration {
     registrationId: string;

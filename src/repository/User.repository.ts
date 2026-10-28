@@ -109,13 +109,13 @@ export const deleteUser = async (id: string) => {
     }
 };
 
-export const getUserByEmailPhoneWithPassword = async (email?: string , phone_no?: string) => {
+export const getUserByEmailPhoneWithPassword = async (email?: string, phone_no?: string) => {
     const isEmail = Boolean(email);
     const identifier = isEmail ? email : phone_no;
     const column = isEmail ? "email" : "phone_no";
     const query = `SELECT * FROM users WHERE ${column} = $1 LIMIT 1;`;
     try {
-        const res = await Query(query, [identifier!]);     // it is guaranteed that any one of this is present
+        const res = await Query(query, [identifier!]); // it is guaranteed that any one of this is present
         return res.rows[0] ?? null;
     } catch (error: unknown) {
         const errorMessage =
