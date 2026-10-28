@@ -25,30 +25,31 @@ export const setRedis = async (
 
     try {
         await redisClient.set(key, data, {
-                EX: expiresInSeconds,
-            });
-    }
-    catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Something went wrong while storing data in Redis";
+            EX: expiresInSeconds,
+        });
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while storing data in Redis";
         throw new AppError(errorMessage, 500);
     }
-}
+};
 
-export const getRedis = async  <T = newUserModelWithOTP>(key: string): Promise<T> => {
+export const getRedis = async <T = newUserModelWithOTP>(key: string): Promise<T> => {
     const data = await redisClient.get(key);
-    if (!data || typeof data != "string" || data.trim() == ""){
+    if (!data || typeof data != "string" || data.trim() == "") {
         throw new AppError("No such user found please try again later", 404);
     }
 
     try {
         const parsed = JSON.parse(data) as T;
         return parsed;
-    } catch (parseError ) {
+    } catch (parseError) {
         console.error(`Malformed JSON payload in Redis key "${key}":`, parseError);
         throw new AppError("Corrupted data encountered in cache", 500);
     }
-}
-
+};
 
 export const deleteRedis = async (key: string): Promise<void> => {
     try {

@@ -29,7 +29,6 @@ export const whatsappOtpVerifier = new WhatsAppOtpVerifier({
     defaultTtlSeconds: phoneVerificationTtl,
 });
 
-export const getPhoneVerificationKey = (sessionId: string) =>
-    `wa_verify_status:${sessionId}`;
+export const getPhoneVerificationKey = (sessionId: string) => `wa_verify_status:${sessionId}`;
 
 export { phoneVerificationTtl };
