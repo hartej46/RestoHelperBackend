@@ -1,4 +1,5 @@
 import Query from "../db/query.ts";
+import { withTransaction } from "../db/db.ts";
 import AppError from "../utils/error.ts";
 import { CreateRestaurantParams, Restaurant } from "../models/Restaurant.model.ts";
 
@@ -28,7 +29,6 @@ export const createRestaurantTable = async () => {
         logo_id TEXT,
         
         avg_dining_price VARCHAR(10),
-        more_info TEXT[],
 
         status restaurant_status,
         is_open BOOLEAN DEFAULT false,
@@ -41,9 +41,23 @@ export const createRestaurantTable = async () => {
         REFERENCES users(id)
     )`;
 
+    const createMoreInfoTableQuery = `CREATE TABLE IF NOT EXISTS restaurant_more_info (
+        id SERIAL PRIMARY KEY,
+
+        restaurant_id UUID NOT NULL
+            REFERENCES restaurant(id) ON DELETE CASCADE,
+
+        info VARCHAR(100) NOT NULL,
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        UNIQUE (restaurant_id, info)
+    )`;
+
     try {
         await Query(createTypeRestaurantStatus, []);
         await Query(createTableQuery, []);
+        await Query(createMoreInfoTableQuery, []);
     } catch (error) {
         const errorMessage =
             error instanceof Error
@@ -53,8 +67,19 @@ export const createRestaurantTable = async () => {
     }
 };
 
-export const getRestaurantById = async (id: string) => {
-    const query = `SELECT * FROM restaurant WHERE id = $1;`;
+export const getRestaurantById = async (id: string): Promise<Restaurant | null> => {
+    const query = `
+        SELECT 
+            r.*,
+            COALESCE(
+                ARRAY_AGG(rmi.info) FILTER (WHERE rmi.info IS NOT NULL),
+                '{}'
+            ) AS more_info
+        FROM restaurant r
+        LEFT JOIN restaurant_more_info rmi ON r.id = rmi.restaurant_id
+        WHERE r.id = $1
+        GROUP BY r.id;
+    `;
 
     try {
         const res = await Query(query, [id]);
@@ -66,8 +91,20 @@ export const getRestaurantById = async (id: string) => {
     }
 };
 
-export const getRestaurantsByOwnerId = async (ownerId: string) => {
-    const query = `SELECT * FROM restaurant WHERE owner_id = $1 ORDER BY created_at DESC;`;
+export const getRestaurantsByOwnerId = async (ownerId: string): Promise<Restaurant[]> => {
+    const query = `
+        SELECT 
+            r.*,
+            COALESCE(
+                ARRAY_AGG(rmi.info) FILTER (WHERE rmi.info IS NOT NULL),
+                '{}'
+            ) AS more_info
+        FROM restaurant r
+        LEFT JOIN restaurant_more_info rmi ON r.id = rmi.restaurant_id
+        WHERE r.owner_id = $1
+        GROUP BY r.id
+        ORDER BY r.created_at DESC;
+    `;
 
     try {
         const res = await Query(query, [ownerId]);
@@ -129,51 +166,119 @@ export const updateRestaurantContactDetails = async (
 };
 
 export const createRestaurant = async (data: CreateRestaurantParams): Promise<Restaurant> => {
-    const query = `
-        INSERT INTO restaurant (
-            owner_id,
-            restaurant_name,
-            description,
-            address,
-            phone_no,
-            email_id,
-            opening_time,
-            closing_time,
-            website_url,
-            logo_id,
-            avg_dining_price,
-            more_info,
-            status,
-            is_open
-        ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
-        )
-        RETURNING *;
-    `;
-
-    const values = [
-        data.owner_id,
-        data.restaurant_name,
-        data.description || null,
-        data.address,
-        data.phone_no || null,
-        data.email_id,
-        data.opening_time,
-        data.closing_time,
-        data.website_url || null,
-        data.logo_id || null,
-        data.avg_dining_price || null,
-        data.more_info || null,
-        data.status || "Active",
-        data.is_open ?? false,
-    ];
-
     try {
-        const res = await Query(query, values);
-        return res.rows[0];
+        return await withTransaction(async (client) => {
+            const query = `
+                INSERT INTO restaurant (
+                    owner_id,
+                    restaurant_name,
+                    description,
+                    address,
+                    phone_no,
+                    email_id,
+                    opening_time,
+                    closing_time,
+                    website_url,
+                    logo_id,
+                    avg_dining_price,
+                    status,
+                    is_open
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+                )
+                RETURNING *;
+            `;
+
+            const values = [
+                data.owner_id,
+                data.restaurant_name,
+                data.description || null,
+                data.address,
+                data.phone_no || null,
+                data.email_id,
+                data.opening_time,
+                data.closing_time,
+                data.website_url || null,
+                data.logo_id || null,
+                data.avg_dining_price || null,
+                data.status || "Active",
+                data.is_open ?? false,
+            ];
+
+            const res = await client.query(query, values);
+            const restaurant = res.rows[0];
+
+            const moreInfoList: string[] = [];
+            if (data.more_info && data.more_info.length > 0) {
+                const uniqueInfo = [
+                    ...new Set(data.more_info.map((i) => i.trim()).filter(Boolean)),
+                ];
+                for (const info of uniqueInfo) {
+                    await client.query(
+                        `INSERT INTO restaurant_more_info (restaurant_id, info)
+                         VALUES ($1, $2)
+                         ON CONFLICT (restaurant_id, info) DO NOTHING;`,
+                        [restaurant.id, info]
+                    );
+                    moreInfoList.push(info);
+                }
+            }
+
+            restaurant.more_info = moreInfoList;
+            return restaurant;
+        });
     } catch (error: unknown) {
         const errorMessage =
             error instanceof Error ? error.message : "Database error in createRestaurant";
+        throw new AppError(errorMessage, 500);
+    }
+};
+
+export const addRestaurantMoreInfo = async (restaurantId: string, info: string) => {
+    const query = `
+        INSERT INTO restaurant_more_info (restaurant_id, info)
+        VALUES ($1, $2)
+        ON CONFLICT (restaurant_id, info) DO NOTHING
+        RETURNING id, restaurant_id, info, created_at;
+    `;
+    try {
+        const res = await Query(query, [restaurantId, info.trim()]);
+        return res.rows[0] || null;
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error ? error.message : "Database error in addRestaurantMoreInfo";
+        throw new AppError(errorMessage, 500);
+    }
+};
+
+export const removeRestaurantMoreInfo = async (restaurantId: string, info: string) => {
+    const query = `
+        DELETE FROM restaurant_more_info
+        WHERE restaurant_id = $1 AND info = $2
+        RETURNING id, restaurant_id, info;
+    `;
+    try {
+        const res = await Query(query, [restaurantId, info.trim()]);
+        return res.rows[0] || null;
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error ? error.message : "Database error in removeRestaurantMoreInfo";
+        throw new AppError(errorMessage, 500);
+    }
+};
+
+export const getRestaurantMoreInfo = async (restaurantId: string): Promise<string[]> => {
+    const query = `
+        SELECT info FROM restaurant_more_info
+        WHERE restaurant_id = $1
+        ORDER BY created_at ASC;
+    `;
+    try {
+        const res = await Query(query, [restaurantId]);
+        return res.rows.map((row) => row.info);
+    } catch (error: unknown) {
+        const errorMessage =
+            error instanceof Error ? error.message : "Database error in getRestaurantMoreInfo";
         throw new AppError(errorMessage, 500);
     }
 };
