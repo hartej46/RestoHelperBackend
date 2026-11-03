@@ -36,3 +36,10 @@ export interface CreateRestaurantParams {
     status?: RestaurantStatus;
     is_open?: boolean;
 }
+
+export interface RestaurantMoreInfo {
+    id: number;
+    restaurant_id: string;
+    info: string;
+    created_at: Date;
+}
