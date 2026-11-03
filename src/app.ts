@@ -27,9 +27,10 @@ app.use(
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
-app.use("/api/users", userRouter);
-app.use("/api/media", mediaRouter);
-app.use("/api/restaurants", restaurantRouter);
-app.use("/api/restaurant", restaurantRouter);
+app.use("/api/v1/users", userRouter);
+app.use("/api/v1/media", mediaRouter);
+app.use("/api/v1/restaurants", restaurantRouter);
+app.use("/api/v1/restaurant", restaurantRouter);
+app.use("/api/v1/restaurants", restaurantRouter);
 
 export default app;

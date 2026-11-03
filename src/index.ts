@@ -4,6 +4,7 @@ import { connectDB } from "./db/db.ts";
 import { createTableUser } from "./repository/User.repository.ts";
 import { createSessionTable } from "./repository/Session.repository.ts";
 import { createRestaurantTable } from "./repository/Restaurant.repository.ts";
+import { createRestaurantEmployeeTable } from "./repository/RestaurantEmployee.repository.ts";
 import { connectRedis } from "./db/redis.ts";
 
 const PORT = process.env.PORT || 8000;
@@ -12,6 +13,7 @@ const initDB = async () => {
     await createTableUser();
     await createSessionTable();
     await createRestaurantTable();
+    await createRestaurantEmployeeTable();
     console.log("All database tables initialized successfully");
 };
 
