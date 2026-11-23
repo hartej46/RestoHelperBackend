@@ -9,6 +9,7 @@ import { getMyEmployedRestaurants } from "../controllers/restaurantEmployee.cont
 import { authentication } from "../middlewares/auth.middleware.ts";
 import { validateNewRestaurant } from "../middlewares/validateBody.ts";
 import restaurantEmployeeRouter from "./restaurantEmployee.routes.ts";
+import restaurantMoreInfoRouter from "./restaurantMoreInfo.routes.ts";
 
 const restaurantRouter = Router();
 
@@ -19,5 +20,6 @@ restaurantRouter.get("/:id", getRestaurant);
 restaurantRouter.patch("/:id/status", authentication, toggleRestaurantStatus);
 
 restaurantRouter.use("/:restaurantId/employees", restaurantEmployeeRouter);
+restaurantRouter.use("/:restaurantId/tags", restaurantMoreInfoRouter);
 
 export default restaurantRouter;

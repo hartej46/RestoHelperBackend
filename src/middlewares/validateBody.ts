@@ -7,6 +7,7 @@ import {
     UpdateEmployeeRoleSchema,
     UpdateEmployeeStatusSchema,
 } from "../schema/restaurantEmployee.schema.ts";
+import { AddRestaurantTagsSchema } from "../schema/restaurantMoreInfo.schema.ts";
 
 export const validateNewUser = asyncHandler(async (req, res, next) => {
     const result = CreateUserSchema.safeParse(req.body);
@@ -45,6 +46,15 @@ export const validateUpdateEmployeeRole = asyncHandler(async (req, res, next) =>
 
 export const validateUpdateEmployeeStatus = asyncHandler(async (req, res, next) => {
     const result = UpdateEmployeeStatusSchema.safeParse(req.body);
+
+    if (!result.success) throw new AppError(result.error.issues[0].message, 400);
+
+    req.body = result.data;
+    return next();
+});
+
+export const validateAddRestaurantTags = asyncHandler(async (req, res, next) => {
+    const result = AddRestaurantTagsSchema.safeParse(req.body);
 
     if (!result.success) throw new AppError(result.error.issues[0].message, 400);
 
